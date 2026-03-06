@@ -58,12 +58,22 @@ def upload_file(token, owner, repo, branch, file_path, remote_path, commit_messa
         "Accept": "application/vnd.github.v3+json"
     }
     
+    # 尝试获取文件信息，获取SHA值
+    sha = None
+    get_response = requests.get(url, headers=headers, params={"ref": branch}, verify=False)
+    if get_response.status_code == 200:
+        sha = get_response.json().get("sha")
+    
     # 请求数据
     data = {
         "message": commit_message,
         "content": content,
         "branch": branch
     }
+    
+    # 如果文件已存在，添加SHA值
+    if sha:
+        data["sha"] = sha
     
     # 发送请求
     response = requests.put(url, headers=headers, json=data, verify=False)
