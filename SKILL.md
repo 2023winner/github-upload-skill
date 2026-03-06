@@ -207,6 +207,79 @@ fatal: Authentication failed for 'https://github.com/用户名/仓库名.git/'
 **解决方案**：
 确保使用正确的GitHub个人访问令牌，并且令牌具有足够的权限。
 
+### 4. MCP GitHub工具认证问题
+
+**问题**：
+Trea IDE的内置GitHub MCP工具可能遇到认证问题，导致API调用失败。
+
+**解决方案**：
+使用Python脚本通过GitHub API直接上传文件，或使用Git命令行工具。
+
+### 5. 命令解析问题
+
+**问题**：
+在使用trae-sandbox执行包含空格或特殊字符的命令时，可能会遇到解析错误。
+
+**解决方案**：
+- 使用更简单的命令格式
+- 避免在命令中使用特殊字符和空格
+- 对于复杂命令，使用Python脚本替代
+
+### 6. 配置文件路径问题
+
+**问题**：
+脚本可能无法找到配置文件，特别是当脚本在子目录中时。
+
+**解决方案**：
+在脚本中添加路径处理，确保能够找到配置文件：
+```python
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config
+```
+
+### 7. PowerShell命令语法问题
+
+**问题**：
+PowerShell不支持 `&&` 等bash风格的命令连接符。
+
+**解决方案**：
+分别执行每个命令，或使用PowerShell的语法：
+```powershell
+command1; command2; command3
+```
+
+### 8. 敏感文件上传问题
+
+**问题**：
+配置文件中包含敏感信息（如GitHub令牌），可能被误上传到GitHub。
+
+**解决方案**：
+- 创建 `.gitignore` 文件，添加敏感文件到忽略列表
+- 在上传脚本中添加逻辑，跳过敏感文件的上传
+- 使用环境变量或加密的配置管理方案
+
+### 9. 文件大小限制
+
+**问题**：
+GitHub API对文件大小有限制（通常为100MB）。
+
+**解决方案**：
+- 对于大文件，使用Git命令行上传
+- 考虑使用Git LFS（Large File Storage）
+- 拆分大文件为多个小文件
+
+### 10. 网络连接问题
+
+**问题**：
+网络连接不稳定或防火墙限制可能导致上传失败。
+
+**解决方案**：
+- 检查网络连接
+- 尝试使用代理服务器
+- 重试上传操作
+- 确保GitHub API的访问权限
+
 ## 示例
 
 ### 示例1：上传单个Python文件
