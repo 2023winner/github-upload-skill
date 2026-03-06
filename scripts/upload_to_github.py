@@ -105,14 +105,51 @@ def upload_directory(token, owner, repo, branch, directory, commit_message):
             print(f"正在上传: {local_path} -> {remote_path}")
             upload_file(token, owner, repo, branch, local_path, remote_path, commit_message)
 
+# 检测本地Git设置
+def detect_git_settings():
+    """
+    检测本地Git设置，获取用户名和邮箱
+    """
+    import subprocess
+    settings = {}
+    
+    # 尝试获取Git用户名
+    try:
+        result = subprocess.run(
+            ['git', 'config', 'user.name'],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode == 0:
+            settings['name'] = result.stdout.strip()
+    except Exception:
+        pass
+    
+    # 尝试获取Git邮箱
+    try:
+        result = subprocess.run(
+            ['git', 'config', 'user.email'],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode == 0:
+            settings['email'] = result.stdout.strip()
+    except Exception:
+        pass
+    
+    return settings
+
 # 主函数
 def main():
     """
     主函数
     """
     parser = argparse.ArgumentParser(description="从Trea IDE上传文件到GitHub仓库")
-    parser.add_argument("--token", help="GitHub个人访问令牌，默认从config.py读取")
-    parser.add_argument("--owner", help="GitHub用户名，默认从config.py读取")
+    parser.add_argument("--token", help="GitHub个人访问令牌，默认从config.py或环境变量读取")
+    parser.add_argument("--owner", help="GitHub用户名，默认从config.py、环境变量或Git设置读取")
+    parser.add_argument("--email", help="GitHub邮箱，默认从config.py、环境变量或Git设置读取")
     parser.add_argument("--repo", required=True, help="仓库名称")
     parser.add_argument("--branch", default="main", help="分支名称，默认main")
     parser.add_argument("--file", help="要上传的文件路径")
@@ -121,24 +158,62 @@ def main():
     parser.add_argument("--commit-message", default="从Trea IDE上传文件", help="提交信息")
     parser.add_argument("--create-repo", action="store_true", help="是否创建新仓库")
     parser.add_argument("--repo-description", default="从Trea IDE上传的项目", help="仓库描述")
+    parser.add_argument("--config-file", help="配置文件路径，默认在脚本所在目录或上级目录")
     
     args = parser.parse_args()
     
+    # 尝试从环境变量读取
+    if not args.token:
+        args.token = os.environ.get('GITHUB_TOKEN')
+    if not args.owner:
+        args.owner = os.environ.get('GITHUB_OWNER')
+    if not args.email:
+        args.email = os.environ.get('GITHUB_EMAIL')
+    
     # 尝试从配置文件读取
-    try:
-        # 尝试从上级目录导入config
-        import sys
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        import config
-        if not args.token:
-            args.token = config.GITHUB_TOKEN
-        if not args.owner:
-            args.owner = config.GITHUB_OWNER
-    except ImportError:
-        # 如果配置文件不存在，检查必要参数
-        if not args.token or not args.owner:
-            print("错误: 请提供GitHub个人访问令牌和用户名，或创建config.py配置文件")
-            return
+    config_paths = []
+    if args.config_file:
+        config_paths.append(args.config_file)
+    # 尝试脚本所在目录和上级目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_paths.append(os.path.join(script_dir, 'config.py'))
+    config_paths.append(os.path.join(os.path.dirname(script_dir), 'config.py'))
+    
+    for config_path in config_paths:
+        if os.path.exists(config_path):
+            try:
+                # 动态导入配置文件
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("config", config_path)
+                config = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(config)
+                
+                if not args.token and hasattr(config, 'GITHUB_TOKEN'):
+                    args.token = config.GITHUB_TOKEN
+                if not args.owner and hasattr(config, 'GITHUB_OWNER'):
+                    args.owner = config.GITHUB_OWNER
+                if not args.email and hasattr(config, 'GITHUB_EMAIL'):
+                    args.email = config.GITHUB_EMAIL
+                break
+            except Exception as e:
+                print(f"读取配置文件 {config_path} 时出错: {e}")
+                continue
+    
+    # 尝试从Git设置读取
+    if not args.owner or not args.email:
+        git_settings = detect_git_settings()
+        if not args.owner and 'name' in git_settings:
+            args.owner = git_settings['name']
+        if not args.email and 'email' in git_settings:
+            args.email = git_settings['email']
+    
+    # 检查必要参数
+    if not args.token:
+        print("错误: 请提供GitHub个人访问令牌，或设置GITHUB_TOKEN环境变量，或在config.py中配置")
+        return
+    if not args.owner:
+        print("错误: 请提供GitHub用户名，或设置GITHUB_OWNER环境变量，或在config.py中配置，或设置Git user.name")
+        return
     
     # 如果需要创建仓库
     if args.create_repo:
